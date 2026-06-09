@@ -3,31 +3,29 @@ import { loginUser } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useState } from "react";
 import { GraduationCap, ArrowRight, Loader2 } from "lucide-react";
-import Link from 'next/link'; // <-- Added this to make routing work
+import Link from 'next/link'; 
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(""); // <-- Added this so you can see login errors
+  const [error, setError] = useState(""); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(""); // Clear previous errors
+    setError(""); 
 
     try {
-      // 1. Call the API function we just built
       const data = await loginUser(email, password);
       
-      // 2. Redirect to the dashboard ONLY after successful login
       if (data.access_token) {
          router.push('/dashboard');
       }
     } catch (err) {
       console.error("Login failed!", err);
-      setError("Invalid email or password."); // Show error on screen
+      setError("Invalid email or password.");
     } finally {
       setLoading(false);
     }
@@ -51,7 +49,6 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="mt-8 space-y-6">
           
-          {/* Displays error if login fails */}
           {error && (
             <div className="rounded-lg bg-red-900/30 border border-red-800 p-3 text-sm text-red-400 text-center">
               {error}
@@ -104,14 +101,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* --- ADDED SIGN UP LINK HERE --- */}
         <div className="mt-6 border-t border-gray-800 pt-6 text-center text-sm text-gray-400">
           <p>Don't have an account?</p>
           <Link href="/signup" className="mt-2 inline-block font-bold text-blue-500 transition-colors hover:text-blue-400">
             Request Access / Sign Up &rarr;
           </Link>
         </div>
-        {/* ------------------------------- */}
 
         <div className="mt-6 text-center text-xs text-gray-600">
           <p>Demo Access: Use any email containing "instructor" to view the config panel, or anything else for the TA dashboard.</p>

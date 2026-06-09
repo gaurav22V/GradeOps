@@ -1,9 +1,10 @@
 "use client";
-import { signupUser } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useState } from "react";
 import { GraduationCap, UserPlus, Loader2 } from "lucide-react";
 import Link from 'next/link';
+import { useAuth } from '@/lib/AuthContext';
+import { signupUser, loginUser } from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -13,14 +14,17 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const { login } = useAuth(); 
   const handleSignup = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    
     try {
       await signupUser(email, password, role);
-      alert("Account created! Please log in.");
-      router.push('/login'); // Redirect to login as requested
+      const authData = await loginUser(email, password);
+      login(authData.token, authData.role, authData.email); 
+      
     } catch (err) {
       setError(err.message || "Failed to create account.");
     } finally {

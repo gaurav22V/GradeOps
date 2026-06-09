@@ -1,51 +1,68 @@
 import axios from 'axios';
 
-// This baseURL automatically switches between localhost and your Render URL 
-// based on the environment variable set in Vercel.
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-});
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Helper to get token (Standardized to 'gradeops_token')
-const getAuthHeaders = () => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('gradeops_token') : null;
-  if (!token) throw new Error("No token found. Please log in.");
-  return { 'Authorization': `Bearer ${token}` };
+const getHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
 };
 
-// 1. LOGIN GLUE
+// login function
 export const loginUser = async (email, password) => {
   const formData = new URLSearchParams();
-  formData.append("username", email);
-  formData.append("password", password);
+  formData.append('username', email);
+  formData.append('password', password);
 
-  // Using api (Axios) instead of fetch for consistency
-  const response = await api.post('/api/auth/login', formData, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData,
   });
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem("gradeops_token", response.data.access_token);
-  }
+  if (!response.ok) throw new Error("Invalid credentials");
   
-  return response.data;
+  const data = await response.json();
+  
+  const base64Url = data.access_token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const payload = JSON.parse(window.atob(base64));
+
+  return { token: data.access_token, role: payload.role, email: payload.sub };
 };
 
-// 2. SIGNUP GLUE
-export const signupUser = async (email, password, role) => {
-  const response = await api.post('/api/auth/signup', { email, password, role });
-  return response.data;
-};
-
-// 3. FETCH PENDING REVIEWS
 export const fetchPendingReviews = async () => {
-  const response = await api.get('/api/dashboard/pending', { 
-    headers: getAuthHeaders() 
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/pending`, {
+    headers: getHeaders(),
   });
-  return response.data;
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+  }
+  return response.json();
 };
 
-// 4. FETCH SINGLE SUBMISSION
+// Signup function
+export const signupUser = async (email, password, role) => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password, role }), 
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.detail || "Failed to create account");
+  }
+
+  return data;
+};
+
 export const fetchSubmissionById = async (id) => {
   const response = await api.get(`/api/submissions/${id}`, { 
     headers: getAuthHeaders() 
@@ -53,7 +70,6 @@ export const fetchSubmissionById = async (id) => {
   return response.data;
 };
 
-// 5. SUBMIT REVIEW
 export const submitReview = async (recordId, finalScore, status) => {
   const response = await api.put(`/api/reviews/${recordId}`, {
     final_score: finalScore,
@@ -64,21 +80,26 @@ export const submitReview = async (recordId, finalScore, status) => {
   return response.data;
 };
 
-// 6. CREATE EXAM
 export const createExam = async (title, rubric) => {
-  const response = await api.post('/api/exams/', { title, rubric }, { 
-    headers: getAuthHeaders() 
+  const response = await fetch(`${API_BASE_URL}/api/exams/`, {
+    method: 'POST',
+    headers: getHeaders(), // <--- Using the new helper we made
+    body: JSON.stringify({ title, rubric }),
   });
-  return response.data;
+  return response.json();
 };
 
-// 7. UPLOAD SUBMISSIONS
 export const uploadSubmission = async (examId, formData) => {
-  const response = await api.post(`/api/exams/${examId}/submissions/`, formData, {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_BASE_URL}/api/exams/${examId}/submissions/`, {
+    method: 'POST',
     headers: {
-      ...getAuthHeaders(),
-      'Content-Type': 'multipart/form-data'
-    }
+      // No Content-Type here! The browser handles FormData boundaries automatically.
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: formData,
   });
-  return response.data;
+  
+  return response.json();
 };

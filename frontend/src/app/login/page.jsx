@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from "react";
 import { GraduationCap, ArrowRight, Loader2 } from "lucide-react";
 import Link from 'next/link';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,17 +13,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(""); 
 
+  const login = useAuth().login; 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
       const data = await loginUser(email, password);
-      if (data.access_token) {
-         router.push('/dashboard');
-      }
+      login(data.token, data.role, data.email); 
     } catch (err) {
-      setError(err.message || "Failed to login. Check your credentials.");
+      setError("Invalid email or password.");
     } finally {
       setLoading(false);
     }
