@@ -5,19 +5,18 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Ensure we are using the asyncpg driver for NeonDB
 database_url = settings.DATABASE_URL
 if database_url.startswith("postgresql://"):
     database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# Create the async engine
 engine = create_async_engine(
     database_url,
-    echo=False,          
-    pool_pre_ping=True,  # Prevents dropped connections
+    echo=False,
+    pool_pre_ping=True,
+    pool_size=5,       
+    max_overflow=2      
 )
 
-# Create the async session factory
 SessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -28,7 +27,6 @@ SessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 async def get_db():
-    """Dependency to generate an async database session for a single request."""
     async with SessionLocal() as session:
         try:
             yield session
@@ -38,7 +36,6 @@ async def get_db():
             raise
 
 async def init_db():
-    """Creates tables asynchronously on startup."""
     from app.db import models
     async with engine.begin() as conn:
         await conn.run_sync(models.Base.metadata.create_all)

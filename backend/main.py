@@ -18,8 +18,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down GradeOps...")
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
-
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,7 +28,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(exams.router, prefix="/api", tags=["Exams & Grading"])
 
