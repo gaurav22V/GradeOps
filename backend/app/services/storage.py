@@ -1,27 +1,38 @@
 import os
-import boto3
-from botocore.exceptions import NoCredentialsError
+import cloudinary
+import cloudinary.uploader
 from app.core.config import settings
 
 class StorageService:
     def __init__(self):
-        self.s3 = boto3.client('s3')
-        self.bucket_name = os.getenv("AWS_BUCKET_NAME", "gradeops-crops")
-        self.use_s3 = bool(os.getenv("AWS_ACCESS_KEY_ID"))
+        cloudinary.config(
+            cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+            api_key=os.getenv("CLOUDINARY_API_KEY"),
+            api_secret=os.getenv("CLOUDINARY_API_SECRET")
+        )
 
     def upload_file(self, file_path: str, object_name: str) -> str:
-        """Uploads a file to S3 and returns the public URL, or keeps it local if no S3."""
-        if self.use_s3:
-            try:
-                self.s3.upload_file(
-                    file_path, self.bucket_name, object_name,
-                    ExtraArgs={'ACL': 'public-read'} 
-                )
-                os.remove(file_path) 
-                return f"https://{self.bucket_name}.s3.amazonaws.com/{object_name}"
-            except NoCredentialsError:
-                pass
-        
-        return f"/crops/{object_name}"
+        """
+        Uploads a local image crop to Cloudinary and returns its public secure URL.
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Local file not found for upload: {file_path}")
+            
+        try:
+            public_id = os.path.splitext(object_name)[0]
+            response = cloudinary.uploader.upload(
+                file_path,
+                public_id=f"gradeops/crops/{public_id}",
+                overwrite=True,
+                resource_type="image"
+            )
+            
+            # Return the secure HTTPS URL
+            return response.get("secure_url")
+            
+        except Exception as e:
+            print(f"Cloudinary upload failed: {e}")
+            raise e
 
+# Instantiate the service singleton
 storage_service = StorageService()

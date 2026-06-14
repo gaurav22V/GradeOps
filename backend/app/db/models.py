@@ -42,7 +42,7 @@ class Exam(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     instructor_id = Column(Integer, ForeignKey("users.id"))
-    rubric = Column(JSONB, nullable=False) # The JSON Rubric for the LangGraph agent
+    rubric = Column(JSONB, nullable=False) 
     created_at = Column(DateTime, default=datetime.utcnow)
 
     instructor = relationship("User", back_populates="exams")

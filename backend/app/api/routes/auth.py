@@ -47,11 +47,11 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: AsyncSession = Depends(get_db)
 ):
-    # 1. The Async way to query the database
+    # Querying the database
     result = await db.execute(select(models.User).filter(models.User.email == form_data.username))
     user = result.scalars().first()
 
-    # 2. Verify the user exists and password matches
+    # Verify if the User Exists and the Password Matches
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -66,7 +66,7 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-
+# adding demo users for testing auth
 @router.get("/seed")
 async def seed_demo_users(db: AsyncSession = Depends(get_db)):
     from app.core.security import get_password_hash
@@ -90,4 +90,4 @@ async def seed_demo_users(db: AsyncSession = Depends(get_db)):
     db.add_all([ta, instructor])
     await db.commit()
     
-    return {"message": "Success! Demo users have been injected into the database."}
+    return {"message": "Success!"}

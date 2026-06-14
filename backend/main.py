@@ -9,18 +9,21 @@ from app.api.routes import exams, auth
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing database...")
+    logger.info("Initializing database")
     await init_db()
-    logger.info("Database ready. Booting GradeOps AI Engine...")
+    logger.info("Database ready. Booting.")
     yield
-    logger.info("Shutting down GradeOps...")
+    logger.info("Shutting down.")
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
 raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
+# CORS Middleware Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS, 
@@ -28,6 +31,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(exams.router, prefix="/api", tags=["Exams & Grading"])
 

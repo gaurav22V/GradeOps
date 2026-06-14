@@ -6,10 +6,9 @@ from typing import List, Dict
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-
-# --- The crucial Async imports ---
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db, SessionLocal
 from app.db import models
@@ -30,19 +29,25 @@ class ReviewSubmit(BaseModel):
     status: models.GradeStatus 
 
 async def process_exam_pipeline(exam_id: int, file_path: str, student_id: str, original_filename: str):
-    """Runs in the background. Now uses async database sessions safely."""
+    """Runs in the background."""
     async with SessionLocal() as db:
         try:
             result = await db.execute(select(models.Exam).filter(models.Exam.id == exam_id))
             exam = result.scalars().first()
             
             ocr_result = ocr_service.extract_and_transcribe(file_path, student_id, str(exam_id))
-            
+            print("--- 1. ABOUT TO UPLOAD TO CLOUDINARY ---")
+            print(f"Crop path exists?: {os.path.exists(ocr_result['crop_path'])}")
+
             cloud_url = storage_service.upload_file(ocr_result["crop_path"], os.path.basename(ocr_result["crop_path"]))
+
+            print(f"--- 2. CLOUDINARY RETURNED: {cloud_url} ---")
             
             submission = models.Submission(
-                exam_id=exam.id, student_identifier=student_id,
-                file_url=cloud_url, extracted_text=ocr_result["transcribed_text"]
+                exam_id=exam_id,
+                student_identifier=student_id,
+                file_url=cloud_url,  
+                extracted_text=ocr_result["transcribed_text"],
             )
             db.add(submission)
             await db.commit()
@@ -50,8 +55,12 @@ async def process_exam_pipeline(exam_id: int, file_path: str, student_id: str, o
 
             past_subs_result = await db.execute(select(models.Submission).filter(models.Submission.exam_id == exam_id))
             past_texts = [sub.extracted_text for sub in past_subs_result.scalars().all() if sub.extracted_text]
-            is_flagged = plagiarism_detector.check_similarity(ocr_result["transcribed_text"], past_texts)
 
+            if len(past_texts) == 0:
+                is_flagged = False
+            else:
+                is_flagged = plagiarism_detector.check_similarity(ocr_result["transcribed_text"], past_texts)
+            
             initial_state = {
                 "student_transcript": ocr_result["transcribed_text"],
                 "rubric": exam.rubric, "criterion_index": 0, "evaluations": [], "total_score": 0.0
@@ -65,12 +74,12 @@ async def process_exam_pipeline(exam_id: int, file_path: str, student_id: str, o
             ))
             await db.commit()
         except Exception as e:
-            print(f"Critical error in background AI worker: {e}")
+            import traceback
+            print("CRITICAL ERROR IN BACKGROUND.")
+            traceback.print_exc()  
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path) 
-
-
 
 @router.post("/exams/")
 async def create_exam(exam_in: ExamCreate, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -103,7 +112,6 @@ async def upload_submission(
 
     student_id = file.filename.split(".")[0]
     
-    # Fire and forget the async task
     background_tasks.add_task(process_exam_pipeline, exam_id, file_path, student_id, file.filename)
     
     return {"message": "File uploaded successfully. AI is processing in the background."}
@@ -111,7 +119,9 @@ async def upload_submission(
 @router.get("/dashboard/pending")
 async def get_pending_reviews(db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
     result = await db.execute(
-        select(models.GradeRecord).filter(models.GradeRecord.status == models.GradeStatus.NEEDS_REVIEW)
+        select(models.GradeRecord)
+        .filter(models.GradeRecord.status == models.GradeStatus.NEEDS_REVIEW)
+        .options(selectinload(models.GradeRecord.submission)) 
     )
     return result.scalars().all()
 
@@ -131,7 +141,11 @@ async def submit_human_review(record_id: int, review_in: ReviewSubmit, db: Async
 
 @router.get("/exams/{exam_id}/export")
 async def export_grades_csv(exam_id: int, db: AsyncSession = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    result = await db.execute(select(models.Submission).filter(models.Submission.exam_id == exam_id))
+    result = await db.execute(
+        select(models.Submission)
+        .filter(models.Submission.exam_id == exam_id)
+        .options(selectinload(models.Submission.grade_record))
+    )
     submissions = result.scalars().all()
     
     output = io.StringIO()
@@ -149,3 +163,18 @@ async def export_grades_csv(exam_id: int, db: AsyncSession = Depends(get_db), cu
         media_type="text/csv", 
         headers={"Content-Disposition": f"attachment; filename=exam_{exam_id}_grades.csv"}
     )
+
+from sqlalchemy import delete
+
+@router.delete("/dev/nuke-database")
+async def nuke_database(db: AsyncSession = Depends(get_db)):
+    """Temporary dev endpoint to clear ghost data."""
+    try:
+        await db.execute(delete(models.GradeRecord))
+        await db.execute(delete(models.Submission))
+        await db.execute(delete(models.Exam))
+        await db.commit()
+        return {"message": "Ghost data successfully vaporized. Database is clean."}
+    except Exception as e:
+        await db.rollback()
+        return {"error": str(e)}

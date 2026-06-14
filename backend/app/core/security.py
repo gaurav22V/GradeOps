@@ -13,7 +13,7 @@ from passlib.context import CryptContext
 from app.db.database import get_db
 from app.db import models
 
-# --- Configuration ---
+# Configuration for JWT and Password Hashing
 SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-development-key-change-me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  
@@ -38,7 +38,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# --- The Core Dependency (Fully Async) ---
+# Core Dependency 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

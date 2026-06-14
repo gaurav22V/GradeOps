@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const getHeaders = () => {
@@ -64,26 +62,36 @@ export const signupUser = async (email, password, role) => {
 };
 
 export const fetchSubmissionById = async (id) => {
-  const response = await api.get(`/api/submissions/${id}`, { 
-    headers: getAuthHeaders() 
+  const response = await fetch(`${API_BASE_URL}/api/submissions/${id}`, { 
+    headers: getHeaders() 
   });
-  return response.data;
+  if (!response.ok) throw new Error("Failed to fetch submission");
+  return response.json();
 };
 
 export const submitReview = async (recordId, finalScore, status) => {
-  const response = await api.put(`/api/reviews/${recordId}`, {
-    final_score: finalScore,
-    status: status
-  }, { 
-    headers: getAuthHeaders() 
+  const response = await fetch(`${API_BASE_URL}/api/reviews/${recordId}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      final_score: parseFloat(finalScore),
+      status: status.toLowerCase()
+    })
   });
-  return response.data;
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("Backend validation error:", errorData);
+    throw new Error("Failed to submit review");
+  }
+  
+  return response.json();
 };
 
 export const createExam = async (title, rubric) => {
   const response = await fetch(`${API_BASE_URL}/api/exams/`, {
     method: 'POST',
-    headers: getHeaders(), // <--- Using the new helper we made
+    headers: getHeaders(),
     body: JSON.stringify({ title, rubric }),
   });
   return response.json();
@@ -95,7 +103,6 @@ export const uploadSubmission = async (examId, formData) => {
   const response = await fetch(`${API_BASE_URL}/api/exams/${examId}/submissions/`, {
     method: 'POST',
     headers: {
-      // No Content-Type here! The browser handles FormData boundaries automatically.
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: formData,

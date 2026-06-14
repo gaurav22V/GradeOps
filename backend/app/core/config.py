@@ -2,7 +2,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GradeOps API"
-    
     # Database
     DATABASE_URL: str
     
@@ -11,7 +10,12 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     
-    GOOGLE_API_KEY: str
+    GROQ_API_KEY: str
+
+    CLOUDINARY_CLOUD_NAME: str
+    CLOUDINARY_API_KEY: str
+    CLOUDINARY_API_SECRET: str
+    
     class Config:
         env_file = ".env"
 

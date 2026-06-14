@@ -17,7 +17,6 @@ export default function TADashboard() {
   const loadQueue = async () => {
     setLoading(true);
     try {
-      // Uses the clean, authenticated API call from api.js
       const data = await fetchPendingReviews();
       setQueue(data || []);
     } catch (error) {
@@ -33,12 +32,9 @@ export default function TADashboard() {
     const currentRecord = queue[0];
     
     try {
-      // Determine score: use override if provided, else use current AI score
       const finalScore = action === 'override' ? parseFloat(overrideScore) : currentRecord.ai_score;
-      
-      // Submit the review through our centralized API glue
-      await submitReview(currentRecord.id, finalScore, action === 'override' ? 'approved' : 'approved');
-      
+      await submitReview(currentRecord.id, finalScore, action === 'override' ? 'overridden' : 'approved');
+
       // Move to next item in the queue
       setQueue(prev => prev.slice(1));
       setOverrideScore("");
@@ -50,7 +46,7 @@ export default function TADashboard() {
   };
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-gray-950 text-white">
+    <div className="flex h-full items-center justify-center bg-gray-950 text-white">
       <Loader2 className="animate-spin w-8 h-8 text-blue-500" />
     </div>
   );
@@ -64,24 +60,34 @@ export default function TADashboard() {
   );
 
   const current = queue[0];
-  const imageUrl = current.submission?.file_url || "https://placehold.co/600x400/111/444?text=Student+Handwriting+Crop"; 
+  const getImageUrl = (url) => {
+    if (!url) return "https://placehold.co/600x400/111/444?text=Student+Handwriting+Crop";
+    if (url.startsWith('http')) return url;
+    
+    const filename = url.split(/[\\/]/).pop(); 
+    
+    return `http://localhost:8000/crops/${filename}`;
+  };
+
+  const imageUrl = getImageUrl(current.file_url || current.submission?.file_url);
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 font-sans overflow-hidden">
-      {/* Left Pane: Submission Viewer */}
-      <div className="w-1/2 border-r border-gray-800 flex flex-col">
-        <div className="p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center">
+    <div className="flex h-screen w-full bg-gray-950 text-gray-100 font-sans overflow-hidden">
+      
+      {/* Left Pane: Student's Answer Sheet Image */}
+      <div className="w-1/2 h-screen overflow-hidden border-r border-gray-800 flex flex-col">
+        <div className="shrink-0 p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-sm font-semibold tracking-wider text-gray-400 uppercase">Student Submission</h2>
           <span className="px-2 py-1 bg-blue-900/50 text-blue-400 text-xs rounded">Queue: {queue.length} remaining</span>
         </div>
-        <div className="flex-1 p-6 bg-gray-950 flex items-center justify-center">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-950 flex items-center justify-center">
           <img src={imageUrl} alt="Student Answer" className="max-h-full max-w-full rounded-lg border border-gray-800 shadow-2xl" />
         </div>
       </div>
 
       {/* Right Pane: AI Analysis */}
-      <div className="w-1/2 flex flex-col bg-gray-900/30">
-        <div className="p-4 bg-gray-900 border-b border-gray-800">
+      <div className="w-1/2 h-screen overflow-hidden flex flex-col bg-gray-900/30">
+        <div className="shrink-0 p-4 bg-gray-900 border-b border-gray-800">
           <h2 className="text-sm font-semibold tracking-wider text-gray-400 uppercase">GradeOps AI Analysis</h2>
         </div>
 
@@ -118,7 +124,7 @@ export default function TADashboard() {
         </div>
 
         {/* Action Bar */}
-        <div className="p-6 bg-gray-950 border-t border-gray-800 grid grid-cols-2 gap-4">
+        <div className="shrink-0 p-6 bg-gray-950 border-t border-gray-800 grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg p-1 pr-2">
             <input 
               type="number" 

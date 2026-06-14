@@ -14,7 +14,7 @@ function AppContent({ children }) {
   if (loading) return <div className="bg-gray-950 h-screen" />; // Wait for state
 
   return (
-    <div className="flex h-screen flex-col bg-gray-950 text-gray-100 antialiased selection:bg-blue-500/30">
+    <div className="flex h-full flex-col bg-gray-950 text-gray-100 antialiased selection:bg-blue-500/30">
       
       {/* Show Navbar ONLY if user is logged in AND not on login/signup page */}
       {user && !isAuthPage && (
